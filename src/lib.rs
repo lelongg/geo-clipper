@@ -1,16 +1,16 @@
 use clipper_sys::{
-    execute, ClipType, ClipType_ctDifference, ClipType_ctIntersection, ClipType_ctUnion,
-    ClipType_ctXor, Path, PolyFillType_pftNonZero, PolyType, PolyType_ptClip, PolyType_ptSubject,
-    Polygon as ClipperPolygon, Polygons, Vertice,
+    execute, free_polygons, ClipType, ClipType_ctDifference, ClipType_ctIntersection,
+    ClipType_ctUnion, ClipType_ctXor, Path, PolyFillType_pftNonZero, PolyType, PolyType_ptClip,
+    PolyType_ptSubject, Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{Coordinate, LineString, MultiPolygon, Polygon};
 
-pub struct ClipperPolygons {
+struct ClipperPolygons {
     pub polygons: Polygons,
     pub factor: f64,
 }
 
-pub struct ClipperPath {
+struct ClipperPath {
     pub path: Path,
     pub factor: f64,
 }
@@ -59,19 +59,20 @@ impl From<ClipperPath> for LineString<f64> {
     }
 }
 
-pub struct PolygonsOwned {
+#[doc(hidden)]
+pub struct OwnedPolygon {
     polygons: Vec<ClipperPolygon>,
     paths: Vec<Vec<Path>>,
     vertices: Vec<Vec<Vec<Vertice>>>,
 }
 
-pub trait ToPolygonOwned {
-    fn to_polygon_owned(&self, poly_type: PolyType, factor: f64) -> PolygonsOwned;
+pub trait ToOwnedPolygon {
+    fn to_polygon_owned(&self, poly_type: PolyType, factor: f64) -> OwnedPolygon;
 }
 
-impl ToPolygonOwned for MultiPolygon<f64> {
-    fn to_polygon_owned(&self, poly_type: PolyType, factor: f64) -> PolygonsOwned {
-        PolygonsOwned {
+impl ToOwnedPolygon for MultiPolygon<f64> {
+    fn to_polygon_owned(&self, poly_type: PolyType, factor: f64) -> OwnedPolygon {
+        OwnedPolygon {
             polygons: Vec::with_capacity(self.0.len()),
             paths: Vec::with_capacity(self.0.len()),
             vertices: Vec::with_capacity(self.0.len()),
@@ -80,9 +81,9 @@ impl ToPolygonOwned for MultiPolygon<f64> {
     }
 }
 
-impl ToPolygonOwned for Polygon<f64> {
-    fn to_polygon_owned(&self, poly_type: PolyType, factor: f64) -> PolygonsOwned {
-        PolygonsOwned {
+impl ToOwnedPolygon for Polygon<f64> {
+    fn to_polygon_owned(&self, poly_type: PolyType, factor: f64) -> OwnedPolygon {
+        OwnedPolygon {
             polygons: Vec::with_capacity(1),
             paths: Vec::with_capacity(1),
             vertices: Vec::with_capacity(1),
@@ -91,7 +92,7 @@ impl ToPolygonOwned for Polygon<f64> {
     }
 }
 
-impl PolygonsOwned {
+impl OwnedPolygon {
     pub fn get_clipper_polygons(&mut self) -> &Vec<ClipperPolygon> {
         for (polygon, (paths, paths_vertices)) in self
             .polygons
@@ -150,7 +151,7 @@ impl PolygonsOwned {
     }
 }
 
-pub fn execute_boolean_operation<T: ToPolygonOwned + ?Sized, U: ToPolygonOwned + ?Sized>(
+fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized>(
     clip_type: ClipType,
     subject_polygons: &T,
     clip_polygons: &U,
@@ -169,19 +170,24 @@ pub fn execute_boolean_operation<T: ToPolygonOwned + ?Sized, U: ToPolygonOwned +
         polygons_count: polygons.len(),
     };
 
-    let solution = ClipperPolygons {
-        polygons: unsafe {
-            execute(
-                clip_type,
-                clipper_polygons,
-                PolyFillType_pftNonZero,
-                PolyFillType_pftNonZero,
-            )
-        },
-        factor,
+    let solution = unsafe {
+        execute(
+            clip_type,
+            clipper_polygons,
+            PolyFillType_pftNonZero,
+            PolyFillType_pftNonZero,
+        )
     };
 
-    solution.into()
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
 }
 
 pub trait Clipper<T: ?Sized> {
@@ -191,7 +197,7 @@ pub trait Clipper<T: ?Sized> {
     fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
 }
 
-impl<T: ToPolygonOwned + ?Sized, U: ToPolygonOwned + ?Sized> Clipper<T> for U {
+impl<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized> Clipper<T> for U {
     fn difference(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctDifference, self, other, factor)
     }
