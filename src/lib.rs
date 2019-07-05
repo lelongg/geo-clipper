@@ -118,7 +118,7 @@ impl OwnedPolygon {
         let last_path_vertices = self.vertices.last_mut().unwrap();
 
         for line_string in std::iter::once(polygon.exterior()).chain(polygon.interiors().iter()) {
-            last_path_vertices.push(Vec::with_capacity(line_string.0.len() - 1));
+            last_path_vertices.push(Vec::with_capacity(line_string.0.len().saturating_sub(1)));
             let last_vertices = last_path_vertices.last_mut().unwrap();
 
             for coordinate in line_string.0.iter().skip(1) {
