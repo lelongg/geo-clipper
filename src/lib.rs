@@ -1,6 +1,6 @@
-//! This crates allows to perform boolean operations on polygons.
+//! This crate allows to perform boolean operations on polygons.
 //!
-//! It make use of [clipper-sys](https://github.com/lelongg/clipper-sys) which is a binding to the C++ version of [Clipper](http://www.angusj.com/delphi/clipper.php).
+//! It makes use of [clipper-sys](https://github.com/lelongg/clipper-sys) which is a binding to the C++ version of [Clipper](http://www.angusj.com/delphi/clipper.php).
 //!
 //! # Example
 //!
