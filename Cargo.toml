@@ -3,7 +3,14 @@ name = "geo-clipper"
 version = "0.1.0"
 authors = ["Gérald Lelong <gerald.lelong@easymov.fr>"]
 edition = "2018"
+license = "ISC"
+readme = "README.md"
+repository = "https://github.com/lelongg/geo-clipper"
+documentation = "https://docs.rs/geo-clipper/"
+description = "Boolean operations on polygons"
+keywords = ["geo", "polygon", "boolean"]
+categories = ["algorithms"]
 
 [dependencies]
-clipper-sys = { path = "../clipper-sys" }
+clipper-sys = "0.1.0"
 geo-types = "0.4.3"
