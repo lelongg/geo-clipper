@@ -52,6 +52,7 @@ use clipper_sys::{
     PolyType_ptSubject, Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{Coordinate, LineString, MultiPolygon, Polygon};
+use std::convert::TryInto;
 
 struct ClipperPolygons {
     pub polygons: Polygons,
@@ -149,11 +150,11 @@ impl OwnedPolygon {
         {
             for (path, vertices) in paths.iter_mut().zip(paths_vertices.iter_mut()) {
                 path.vertices = vertices.as_mut_ptr();
-                path.vertices_count = vertices.len();
+                path.vertices_count = vertices.len().try_into().unwrap();
             }
 
             polygon.paths = paths.as_mut_ptr();
-            polygon.paths_count = paths.len();
+            polygon.paths_count = paths.len().try_into().unwrap();
         }
         &self.polygons
     }
@@ -215,7 +216,7 @@ fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Si
         .collect();
     let clipper_polygons = Polygons {
         polygons: polygons.as_mut_ptr(),
-        polygons_count: polygons.len(),
+        polygons_count: polygons.len().try_into().unwrap(),
     };
 
     let solution = unsafe {
