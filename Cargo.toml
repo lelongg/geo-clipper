@@ -12,5 +12,5 @@ keywords = ["geo", "polygon", "boolean"]
 categories = ["algorithms"]
 
 [dependencies]
-clipper-sys = "0.2.0"
-geo-types = "0.5.0"
+clipper-sys = { git = "ssh://git@github.com/jsadusk/clipper-sys" }
+geo-types = "0.6.0"
