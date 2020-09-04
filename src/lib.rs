@@ -47,12 +47,52 @@
 //! [`xor`]: trait.Clipper.html#method.xor
 
 use clipper_sys::{
-    execute, free_polygons, ClipType, ClipType_ctDifference, ClipType_ctIntersection,
-    ClipType_ctUnion, ClipType_ctXor, Path, PolyFillType_pftNonZero, PolyType, PolyType_ptClip,
+    execute, execute_offset, free_polygons, ClipType, ClipType_ctDifference,
+    ClipType_ctIntersection, ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType,
+    EndType_etClosedLine, EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound,
+    EndType_etOpenSquare, JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound,
+    JoinType_jtSquare, Path, PolyFillType_pftNonZero, PolyType, PolyType_ptClip,
     PolyType_ptSubject, Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{Coordinate, LineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
+
+#[derive(Clone, Copy)]
+pub enum JoinType {
+    Square,
+    Round,
+    Miter,
+}
+
+impl From<JoinType> for ClipperJoinType {
+    fn from(jt: JoinType) -> Self {
+        match jt {
+            JoinType::Square => JoinType_jtSquare,
+            JoinType::Round => JoinType_jtRound,
+            JoinType::Miter => JoinType_jtMiter,
+        }
+    }
+}
+
+impl From<EndType> for ClipperEndType {
+    fn from(et: EndType) -> Self {
+        match et {
+            EndType::ClosedPolygon => EndType_etClosedPolygon,
+            EndType::ClosedLine => EndType_etClosedLine,
+            EndType::OpenButt => EndType_etOpenButt,
+            EndType::OpenSquare => EndType_etOpenSquare,
+            EndType::OpenRound => EndType_etOpenRound,
+        }
+    }
+}
+
+pub enum EndType {
+    ClosedPolygon,
+    ClosedLine,
+    OpenButt,
+    OpenSquare,
+    OpenRound,
+}
 
 struct ClipperPolygons {
     pub polygons: Polygons,
@@ -200,6 +240,32 @@ impl OwnedPolygon {
     }
 }
 
+fn execute_offset_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    delta: f64,
+    jt: JoinType,
+    et: EndType,
+    factor: f64,
+) -> MultiPolygon<f64> {
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe { execute_offset(clipper_polygons, delta, jt.into(), et.into()) };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
 fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized>(
     clip_type: ClipType,
     subject_polygons: &T,
@@ -248,6 +314,13 @@ pub trait Clipper<T: ?Sized> {
     fn intersection(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
     fn union(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
     fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+    fn offset(
+        &self,
+        delta: f64,
+        join_type: JoinType,
+        end_type: EndType,
+        factor: f64,
+    ) -> MultiPolygon<f64>;
 }
 
 impl<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized> Clipper<T> for U {
@@ -265,6 +338,16 @@ impl<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized> Clipper<T> for U {
 
     fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctXor, self, other, factor)
+    }
+
+    fn offset(
+        &self,
+        delta: f64,
+        join_type: JoinType,
+        end_type: EndType,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
+        execute_offset_operation(self, delta, join_type, end_type, factor)
     }
 }
 
