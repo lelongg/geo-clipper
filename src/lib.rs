@@ -314,6 +314,9 @@ pub trait Clipper<T: ?Sized> {
     fn intersection(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
     fn union(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
     fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+}
+
+pub trait ClipperOffset {
     fn offset(
         &self,
         delta: f64,
@@ -339,7 +342,9 @@ impl<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized> Clipper<T> for U {
     fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctXor, self, other, factor)
     }
+}
 
+impl<T: ToOwnedPolygon + ?Sized> ClipperOffset for T {
     fn offset(
         &self,
         delta: f64,
