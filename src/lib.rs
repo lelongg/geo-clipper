@@ -352,7 +352,7 @@ impl<T: ToOwnedPolygon + ?Sized> ClipperOffset for T {
         end_type: EndType,
         factor: f64,
     ) -> MultiPolygon<f64> {
-        execute_offset_operation(self, delta, join_type, end_type, factor)
+        execute_offset_operation(self, delta * factor, join_type, end_type, factor)
     }
 }
 
