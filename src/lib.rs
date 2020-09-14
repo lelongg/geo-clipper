@@ -47,12 +47,12 @@
 //! [`xor`]: trait.Clipper.html#method.xor
 
 use clipper_sys::{
-    execute, execute_offset, free_polygons, ClipType, ClipType_ctDifference,
-    ClipType_ctIntersection, ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType,
-    EndType_etClosedLine, EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound,
-    EndType_etOpenSquare, JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound,
-    JoinType_jtSquare, Path, PolyFillType_pftNonZero, PolyType, PolyType_ptClip,
-    PolyType_ptSubject, Polygon as ClipperPolygon, Polygons, Vertice,
+    execute, free_polygons, offset, ClipType, ClipType_ctDifference, ClipType_ctIntersection,
+    ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType, EndType_etClosedLine,
+    EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound, EndType_etOpenSquare,
+    JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound, JoinType_jtSquare, Path,
+    PolyFillType_pftNonZero, PolyType, PolyType_ptClip, PolyType_ptSubject,
+    Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{Coordinate, LineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
@@ -60,16 +60,25 @@ use std::convert::TryInto;
 #[derive(Clone, Copy)]
 pub enum JoinType {
     Square,
-    Round,
-    Miter,
+    Round(f64),
+    Miter(f64),
+}
+
+#[derive(Clone, Copy)]
+pub enum EndType {
+    ClosedPolygon,
+    ClosedLine,
+    OpenButt,
+    OpenSquare,
+    OpenRound(f64),
 }
 
 impl From<JoinType> for ClipperJoinType {
     fn from(jt: JoinType) -> Self {
         match jt {
             JoinType::Square => JoinType_jtSquare,
-            JoinType::Round => JoinType_jtRound,
-            JoinType::Miter => JoinType_jtMiter,
+            JoinType::Round(_) => JoinType_jtRound,
+            JoinType::Miter(_) => JoinType_jtMiter,
         }
     }
 }
@@ -81,17 +90,9 @@ impl From<EndType> for ClipperEndType {
             EndType::ClosedLine => EndType_etClosedLine,
             EndType::OpenButt => EndType_etOpenButt,
             EndType::OpenSquare => EndType_etOpenSquare,
-            EndType::OpenRound => EndType_etOpenRound,
+            EndType::OpenRound(_) => EndType_etOpenRound,
         }
     }
-}
-
-pub enum EndType {
-    ClosedPolygon,
-    ClosedLine,
-    OpenButt,
-    OpenSquare,
-    OpenRound,
 }
 
 struct ClipperPolygons {
@@ -247,13 +248,35 @@ fn execute_offset_operation<T: ToOwnedPolygon + ?Sized>(
     et: EndType,
     factor: f64,
 ) -> MultiPolygon<f64> {
+    let miter_limit = match jt {
+        JoinType::Miter(limit) => limit,
+        _ => 0.0,
+    };
+
+    let round_precision = match jt {
+        JoinType::Round(precision) => precision,
+        _ => match et {
+            EndType::OpenRound(precision) => precision,
+            _ => 0.0,
+        },
+    };
+
     let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
     let mut get_clipper = owned.get_clipper_polygons().clone();
     let clipper_polygons = Polygons {
         polygons: get_clipper.as_mut_ptr(),
         polygons_count: get_clipper.len().try_into().unwrap(),
     };
-    let solution = unsafe { execute_offset(clipper_polygons, delta, jt.into(), et.into()) };
+    let solution = unsafe {
+        offset(
+            miter_limit,
+            round_precision,
+            jt.into(),
+            et.into(),
+            clipper_polygons,
+            delta,
+        )
+    };
 
     let result = ClipperPolygons {
         polygons: solution,
@@ -402,5 +425,39 @@ mod tests {
 
         let result = subject.intersection(&clip, 1.0);
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_offset() {
+        let expected = MultiPolygon(vec![Polygon::new(
+            LineString(vec![
+                Coordinate { x: 265.0, y: 205.0 },
+                Coordinate { x: 175.0, y: 205.0 },
+                Coordinate { x: 175.0, y: 145.0 },
+                Coordinate { x: 265.0, y: 145.0 },
+            ]),
+            vec![LineString(vec![
+                Coordinate { x: 208.0, y: 185.0 },
+                Coordinate { x: 222.0, y: 185.0 },
+                Coordinate { x: 215.0, y: 170.0 },
+            ])],
+        )]);
+
+        let subject = Polygon::new(
+            LineString(vec![
+                Coordinate { x: 180.0, y: 200.0 },
+                Coordinate { x: 260.0, y: 200.0 },
+                Coordinate { x: 260.0, y: 150.0 },
+                Coordinate { x: 180.0, y: 150.0 },
+            ]),
+            vec![LineString(vec![
+                Coordinate { x: 215.0, y: 160.0 },
+                Coordinate { x: 230.0, y: 190.0 },
+                Coordinate { x: 200.0, y: 190.0 },
+            ])],
+        );
+
+        let result = subject.offset(5.0, JoinType::Miter(5.0), EndType::ClosedPolygon, 1.0);
+        assert_eq!(expected, result)
     }
 }
