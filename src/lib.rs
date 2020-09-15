@@ -328,18 +328,16 @@ fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Si
     result
 }
 
-/// This trait defines the boolean operations between polygons.
+/// This trait defines the boolean and offset operations between polygons
 ///
 /// The `factor` parameter in its methods is used to scale shapes before and after applying the boolean operation
 /// to avoid precision loss since Clipper (the underlaying library) performs integer computation.
-pub trait Clipper<T: ?Sized> {
-    fn difference(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn intersection(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn union(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-}
-
-pub trait ClipperOffset {
+pub trait Clipper {
+    fn difference<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+    fn intersection<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64)
+        -> MultiPolygon<f64>;
+    fn union<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+    fn xor<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
     fn offset(
         &self,
         delta: f64,
@@ -349,25 +347,27 @@ pub trait ClipperOffset {
     ) -> MultiPolygon<f64>;
 }
 
-impl<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized> Clipper<T> for U {
-    fn difference(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+impl<U: ToOwnedPolygon + ?Sized> Clipper for U {
+    fn difference<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctDifference, self, other, factor)
     }
 
-    fn intersection(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn intersection<T: ToOwnedPolygon + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctIntersection, self, other, factor)
     }
 
-    fn union(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn union<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctUnion, self, other, factor)
     }
 
-    fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn xor<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctXor, self, other, factor)
     }
-}
 
-impl<T: ToOwnedPolygon + ?Sized> ClipperOffset for T {
     fn offset(
         &self,
         delta: f64,
