@@ -9,6 +9,6 @@ let
     date = "2020-08-03";
   }).rust.override { extensions = [ "rust-src" ]; };
 in mkShell {
-  buildInputs = [ clang rust openssl pkgconfig cmake ];
+  buildInputs = [ clang rust ];
   LIBCLANG_PATH = "${llvmPackages.libclang}/lib";
 }

@@ -8,7 +8,6 @@
 //! The [`intersection`] method (as well as [`difference`], [`union`] and [`xor`]) is provided by the [`Clipper`] trait which is implemented for some [geo-types](https://docs.rs/geo-types/0.4.3/geo_types/).
 //!
 //! ```
-//! # fn main() {
 //! use geo_types::{Coordinate, LineString, Polygon};
 //! use geo_clipper::Clipper;
 //!
@@ -37,7 +36,6 @@
 //! );
 //!
 //! let result = subject.intersection(&clip, 1.0);
-//! # }
 //! ```
 //!
 //! [`Clipper`]: trait.Clipper.html
