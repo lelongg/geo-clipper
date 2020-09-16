@@ -457,6 +457,13 @@ pub trait ClipperOpen {
         other: &T,
         factor: f64,
     ) -> MultiLineString<f64>;
+    fn offset(
+        &self,
+        delta: f64,
+        join_type: JoinType,
+        end_type: EndType,
+        factor: f64,
+    ) -> MultiPolygon<f64>;
 }
 
 impl<U: ToOwnedPolygon + ClosedPoly + ?Sized> Clipper for U {
@@ -519,13 +526,23 @@ impl<U: ToOwnedPolygon + OpenPath + ?Sized> ClipperOpen for U {
     ) -> MultiLineString<f64> {
         execute_boolean_operation(ClipType_ctIntersection, self, other, factor)
     }
+
+    fn offset(
+        &self,
+        delta: f64,
+        join_type: JoinType,
+        end_type: EndType,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
+        execute_offset_operation(self, delta * factor, join_type, end_type, factor)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /*#[test]
+    #[test]
     fn test_closed_clip() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
@@ -601,18 +618,18 @@ mod tests {
 
         let result = subject.offset(5.0, JoinType::Miter(5.0), EndType::ClosedPolygon, 1.0);
         assert_eq!(expected, result)
-    }*/
+    }
 
     #[test]
     fn test_open_clip() {
         let expected = MultiLineString(vec![
             LineString(vec![
-                Coordinate { x: 100.0, y: 100.0 },
                 Coordinate { x: 200.0, y: 100.0 },
+                Coordinate { x: 100.0, y: 100.0 },
             ]),
             LineString(vec![
-                Coordinate { x: 300.0, y: 100.0 },
                 Coordinate { x: 400.0, y: 100.0 },
+                Coordinate { x: 300.0, y: 100.0 },
             ]),
         ]);
 
@@ -632,6 +649,30 @@ mod tests {
         );
 
         let result = subject.difference(&clip, 1.0);
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_open_offset() {
+        let expected = MultiPolygon(vec![Polygon::new(
+            LineString(vec![
+                Coordinate { x: 405.0, y: 405.0 },
+                Coordinate { x: 395.0, y: 405.0 },
+                Coordinate { x: 395.0, y: 105.0 },
+                Coordinate { x: 95.0, y: 105.0 },
+                Coordinate { x: 95.0, y: 95.0 },
+                Coordinate { x: 405.0, y: 95.0 },
+                Coordinate { x: 405.0, y: 405.0 },
+            ]),
+            vec![],
+        )]);
+
+        let subject = MultiLineString(vec![LineString(vec![
+            Coordinate { x: 100.0, y: 100.0 },
+            Coordinate { x: 400.0, y: 100.0 },
+            Coordinate { x: 400.0, y: 400.0 },
+        ])]);
+        let result = subject.offset(5.0, JoinType::Miter(5.0), EndType::OpenSquare, 1.0);
         assert_eq!(expected, result);
     }
 }
