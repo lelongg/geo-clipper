@@ -54,7 +54,7 @@ use clipper_sys::{
     PolyFillType_pftNonZero, PolyType, PolyType_ptClip, PolyType_ptSubject,
     Polygon as ClipperPolygon, Polygons, Vertice,
 };
-use geo_types::{Coordinate, LineString, MultiPolygon, Polygon};
+use geo_types::{Coordinate, LineString, MultiLineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
 
 #[derive(Clone, Copy)]
@@ -136,6 +136,27 @@ impl From<ClipperPolygons> for MultiPolygon<f64> {
     }
 }
 
+impl From<ClipperPolygons> for MultiLineString<f64> {
+    fn from(polygons: ClipperPolygons) -> Self {
+        MultiLineString(
+            polygons
+                .polygons
+                .polygons()
+                .iter()
+                .flat_map(|polygon| {
+                    polygon.paths().iter().map(|path| {
+                        ClipperPath {
+                            path: *path,
+                            factor: polygons.factor,
+                        }
+                        .into()
+                    })
+                })
+                .collect(),
+        )
+    }
+}
+
 impl From<ClipperPath> for LineString<f64> {
     fn from(path: ClipperPath) -> Self {
         path.path
@@ -148,6 +169,14 @@ impl From<ClipperPath> for LineString<f64> {
             .collect()
     }
 }
+
+pub trait OpenPath {}
+pub trait ClosedPoly {}
+
+impl OpenPath for MultiLineString<f64> {}
+impl OpenPath for LineString<f64> {}
+impl ClosedPoly for MultiPolygon<f64> {}
+impl ClosedPoly for Polygon<f64> {}
 
 #[doc(hidden)]
 pub struct OwnedPolygon {
@@ -179,6 +208,17 @@ impl ToOwnedPolygon for Polygon<f64> {
             vertices: Vec::with_capacity(1),
         }
         .add_polygon(self, poly_type, factor)
+    }
+}
+
+impl ToOwnedPolygon for MultiLineString<f64> {
+    fn to_polygon_owned(&self, poly_type: PolyType, factor: f64) -> OwnedPolygon {
+        OwnedPolygon {
+            polygons: Vec::with_capacity(self.0.len()),
+            paths: Vec::with_capacity(self.0.len()),
+            vertices: Vec::with_capacity(self.0.len()),
+        }
+        .add_line_strings(self, poly_type, factor)
     }
 }
 
@@ -222,6 +262,45 @@ impl OwnedPolygon {
                 vertices: std::ptr::null_mut(),
                 vertices_count: 0,
                 closed: 1,
+            });
+        }
+
+        self.polygons.push(ClipperPolygon {
+            paths: std::ptr::null_mut(),
+            paths_count: 0,
+            type_: poly_type,
+        });
+
+        self
+    }
+
+    fn add_line_strings(
+        mut self,
+        line_strings: &MultiLineString<f64>,
+        poly_type: PolyType,
+        factor: f64,
+    ) -> Self {
+        let path_count = line_strings.0.len();
+        self.paths.push(Vec::with_capacity(path_count));
+        self.vertices.push(Vec::with_capacity(path_count));
+        let last_path = self.paths.last_mut().unwrap();
+        let last_path_vertices = self.vertices.last_mut().unwrap();
+
+        for line_string in line_strings.0.iter() {
+            last_path_vertices.push(Vec::with_capacity(line_string.0.len().saturating_sub(1)));
+            let last_vertices = last_path_vertices.last_mut().unwrap();
+
+            for coordinate in line_string.0.iter() {
+                last_vertices.push([
+                    (coordinate.x * factor) as i64,
+                    (coordinate.y * factor) as i64,
+                ]);
+            }
+
+            last_path.push(Path {
+                vertices: std::ptr::null_mut(),
+                vertices_count: 0,
+                closed: 0,
             });
         }
 
@@ -289,12 +368,16 @@ fn execute_offset_operation<T: ToOwnedPolygon + ?Sized>(
     result
 }
 
-fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized>(
+fn execute_boolean_operation<
+    T: ToOwnedPolygon + ?Sized,
+    U: ToOwnedPolygon + ?Sized,
+    R: From<ClipperPolygons>,
+>(
     clip_type: ClipType,
     subject_polygons: &T,
     clip_polygons: &U,
     factor: f64,
-) -> MultiPolygon<f64> {
+) -> R {
     let mut subject_owned = subject_polygons.to_polygon_owned(PolyType_ptSubject, factor);
     let mut clip_owned = clip_polygons.to_polygon_owned(PolyType_ptClip, factor);
     let mut polygons: Vec<ClipperPolygon> = subject_owned
@@ -332,12 +415,28 @@ fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Si
 ///
 /// The `factor` parameter in its methods is used to scale shapes before and after applying the boolean operation
 /// to avoid precision loss since Clipper (the underlaying library) performs integer computation.
+
 pub trait Clipper {
-    fn difference<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn intersection<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64)
-        -> MultiPolygon<f64>;
-    fn union<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn xor<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+    fn difference<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64>;
+    fn intersection<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64>;
+    fn union<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64>;
+    fn xor<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64>;
     fn offset(
         &self,
         delta: f64,
@@ -347,12 +446,29 @@ pub trait Clipper {
     ) -> MultiPolygon<f64>;
 }
 
-impl<U: ToOwnedPolygon + ?Sized> Clipper for U {
-    fn difference<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+pub trait ClipperOpen {
+    fn difference<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiLineString<f64>;
+    fn intersection<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiLineString<f64>;
+}
+
+impl<U: ToOwnedPolygon + ClosedPoly + ?Sized> Clipper for U {
+    fn difference<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctDifference, self, other, factor)
     }
 
-    fn intersection<T: ToOwnedPolygon + ?Sized>(
+    fn intersection<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
         &self,
         other: &T,
         factor: f64,
@@ -360,11 +476,19 @@ impl<U: ToOwnedPolygon + ?Sized> Clipper for U {
         execute_boolean_operation(ClipType_ctIntersection, self, other, factor)
     }
 
-    fn union<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn union<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctUnion, self, other, factor)
     }
 
-    fn xor<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn xor<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctXor, self, other, factor)
     }
 
@@ -379,12 +503,30 @@ impl<U: ToOwnedPolygon + ?Sized> Clipper for U {
     }
 }
 
+impl<U: ToOwnedPolygon + OpenPath + ?Sized> ClipperOpen for U {
+    fn difference<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiLineString<f64> {
+        execute_boolean_operation(ClipType_ctDifference, self, other, factor)
+    }
+
+    fn intersection<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiLineString<f64> {
+        execute_boolean_operation(ClipType_ctIntersection, self, other, factor)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test() {
+    /*#[test]
+    fn test_closed_clip() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
                 Coordinate { x: 240.0, y: 200.0 },
@@ -428,7 +570,7 @@ mod tests {
     }
 
     #[test]
-    fn test_offset() {
+    fn test_closed_offset() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
                 Coordinate { x: 265.0, y: 205.0 },
@@ -459,5 +601,37 @@ mod tests {
 
         let result = subject.offset(5.0, JoinType::Miter(5.0), EndType::ClosedPolygon, 1.0);
         assert_eq!(expected, result)
+    }*/
+
+    #[test]
+    fn test_open_clip() {
+        let expected = MultiLineString(vec![
+            LineString(vec![
+                Coordinate { x: 100.0, y: 100.0 },
+                Coordinate { x: 200.0, y: 100.0 },
+            ]),
+            LineString(vec![
+                Coordinate { x: 300.0, y: 100.0 },
+                Coordinate { x: 400.0, y: 100.0 },
+            ]),
+        ]);
+
+        let subject = MultiLineString(vec![LineString(vec![
+            Coordinate { x: 100.0, y: 100.0 },
+            Coordinate { x: 400.0, y: 100.0 },
+        ])]);
+        let clip = Polygon::new(
+            LineString(vec![
+                Coordinate { x: 200.0, y: 50.0 },
+                Coordinate { x: 200.0, y: 150.0 },
+                Coordinate { x: 300.0, y: 150.0 },
+                Coordinate { x: 300.0, y: 50.0 },
+                Coordinate { x: 200.0, y: 50.0 },
+            ]),
+            vec![],
+        );
+
+        let result = subject.difference(&clip, 1.0);
+        assert_eq!(expected, result);
     }
 }
