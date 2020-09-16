@@ -1,4 +1,4 @@
-//! This crate allows to perform boolean operations on polygons.
+//! This crate allows to perform boolean and offset operations on polygons.
 //!
 //! It makes use of [clipper-sys](https://github.com/lelongg/clipper-sys) which is a binding to the C++ version of [Clipper](http://www.angusj.com/delphi/clipper.php).
 //!
@@ -47,12 +47,53 @@
 //! [`xor`]: trait.Clipper.html#method.xor
 
 use clipper_sys::{
-    execute, free_polygons, ClipType, ClipType_ctDifference, ClipType_ctIntersection,
-    ClipType_ctUnion, ClipType_ctXor, Path, PolyFillType_pftNonZero, PolyType, PolyType_ptClip,
-    PolyType_ptSubject, Polygon as ClipperPolygon, Polygons, Vertice,
+    execute, free_polygons, offset, ClipType, ClipType_ctDifference, ClipType_ctIntersection,
+    ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType, EndType_etClosedLine,
+    EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound, EndType_etOpenSquare,
+    JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound, JoinType_jtSquare, Path,
+    PolyFillType_pftNonZero, PolyType, PolyType_ptClip, PolyType_ptSubject,
+    Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{Coordinate, LineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
+
+#[derive(Clone, Copy)]
+pub enum JoinType {
+    Square,
+    Round(f64),
+    Miter(f64),
+}
+
+#[derive(Clone, Copy)]
+pub enum EndType {
+    ClosedPolygon,
+    ClosedLine,
+    OpenButt,
+    OpenSquare,
+    OpenRound(f64),
+}
+
+impl From<JoinType> for ClipperJoinType {
+    fn from(jt: JoinType) -> Self {
+        match jt {
+            JoinType::Square => JoinType_jtSquare,
+            JoinType::Round(_) => JoinType_jtRound,
+            JoinType::Miter(_) => JoinType_jtMiter,
+        }
+    }
+}
+
+impl From<EndType> for ClipperEndType {
+    fn from(et: EndType) -> Self {
+        match et {
+            EndType::ClosedPolygon => EndType_etClosedPolygon,
+            EndType::ClosedLine => EndType_etClosedLine,
+            EndType::OpenButt => EndType_etOpenButt,
+            EndType::OpenSquare => EndType_etOpenSquare,
+            EndType::OpenRound(_) => EndType_etOpenRound,
+        }
+    }
+}
 
 struct ClipperPolygons {
     pub polygons: Polygons,
@@ -200,6 +241,54 @@ impl OwnedPolygon {
     }
 }
 
+fn execute_offset_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    delta: f64,
+    jt: JoinType,
+    et: EndType,
+    factor: f64,
+) -> MultiPolygon<f64> {
+    let miter_limit = match jt {
+        JoinType::Miter(limit) => limit,
+        _ => 0.0,
+    };
+
+    let round_precision = match jt {
+        JoinType::Round(precision) => precision,
+        _ => match et {
+            EndType::OpenRound(precision) => precision,
+            _ => 0.0,
+        },
+    };
+
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe {
+        offset(
+            miter_limit,
+            round_precision,
+            jt.into(),
+            et.into(),
+            clipper_polygons,
+            delta,
+        )
+    };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
 fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized>(
     clip_type: ClipType,
     subject_polygons: &T,
@@ -239,32 +328,54 @@ fn execute_boolean_operation<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Si
     result
 }
 
-/// This trait defines the boolean operations between polygons.
+/// This trait defines the boolean and offset operations on polygons
 ///
-/// The `factor` parameter in its methods is used to scale shapes before and after applying the boolean operation
+/// The `factor` parameter in its methods is used to scale shapes before and after applying the operation
 /// to avoid precision loss since Clipper (the underlaying library) performs integer computation.
-pub trait Clipper<T: ?Sized> {
-    fn difference(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn intersection(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn union(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
-    fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+pub trait Clipper {
+    fn difference<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+    fn intersection<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64)
+        -> MultiPolygon<f64>;
+    fn union<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+    fn xor<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64>;
+    fn offset(
+        &self,
+        delta: f64,
+        join_type: JoinType,
+        end_type: EndType,
+        factor: f64,
+    ) -> MultiPolygon<f64>;
 }
 
-impl<T: ToOwnedPolygon + ?Sized, U: ToOwnedPolygon + ?Sized> Clipper<T> for U {
-    fn difference(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+impl<U: ToOwnedPolygon + ?Sized> Clipper for U {
+    fn difference<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctDifference, self, other, factor)
     }
 
-    fn intersection(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn intersection<T: ToOwnedPolygon + ?Sized>(
+        &self,
+        other: &T,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctIntersection, self, other, factor)
     }
 
-    fn union(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn union<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctUnion, self, other, factor)
     }
 
-    fn xor(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
+    fn xor<T: ToOwnedPolygon + ?Sized>(&self, other: &T, factor: f64) -> MultiPolygon<f64> {
         execute_boolean_operation(ClipType_ctXor, self, other, factor)
+    }
+
+    fn offset(
+        &self,
+        delta: f64,
+        join_type: JoinType,
+        end_type: EndType,
+        factor: f64,
+    ) -> MultiPolygon<f64> {
+        execute_offset_operation(self, delta * factor, join_type, end_type, factor)
     }
 }
 
@@ -314,5 +425,39 @@ mod tests {
 
         let result = subject.intersection(&clip, 1.0);
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_offset() {
+        let expected = MultiPolygon(vec![Polygon::new(
+            LineString(vec![
+                Coordinate { x: 265.0, y: 205.0 },
+                Coordinate { x: 175.0, y: 205.0 },
+                Coordinate { x: 175.0, y: 145.0 },
+                Coordinate { x: 265.0, y: 145.0 },
+            ]),
+            vec![LineString(vec![
+                Coordinate { x: 208.0, y: 185.0 },
+                Coordinate { x: 222.0, y: 185.0 },
+                Coordinate { x: 215.0, y: 170.0 },
+            ])],
+        )]);
+
+        let subject = Polygon::new(
+            LineString(vec![
+                Coordinate { x: 180.0, y: 200.0 },
+                Coordinate { x: 260.0, y: 200.0 },
+                Coordinate { x: 260.0, y: 150.0 },
+                Coordinate { x: 180.0, y: 150.0 },
+            ]),
+            vec![LineString(vec![
+                Coordinate { x: 215.0, y: 160.0 },
+                Coordinate { x: 230.0, y: 190.0 },
+                Coordinate { x: 200.0, y: 190.0 },
+            ])],
+        );
+
+        let result = subject.offset(5.0, JoinType::Miter(5.0), EndType::ClosedPolygon, 1.0);
+        assert_eq!(expected, result)
     }
 }
