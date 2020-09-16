@@ -446,6 +446,11 @@ pub trait Clipper {
     ) -> MultiPolygon<f64>;
 }
 
+/// This trait defines the boolean and offset operations between open paths and polygons
+/// It is a subset of the operations for polygons
+///
+/// The `factor` parameter in its methods is used to scale shapes before and after applying the boolean operation
+/// to avoid precision loss since Clipper (the underlaying library) performs integer computation.
 pub trait ClipperOpen {
     fn difference<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
         &self,
