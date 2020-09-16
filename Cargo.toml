@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/lelongg/geo-clipper"
 documentation = "https://docs.rs/geo-clipper/"
 description = "Boolean operations on polygons"
-keywords = ["geo", "polygon", "boolean"]
+keywords = ["geo", "polygon", "boolean", "offset"]
 categories = ["algorithms"]
 
 [dependencies]
