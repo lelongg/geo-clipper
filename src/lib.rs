@@ -1,4 +1,4 @@
-//! This crate allows to perform boolean operations on polygons.
+//! This crate allows to perform boolean and offset operations on polygons.
 //!
 //! It makes use of [clipper-sys](https://github.com/lelongg/clipper-sys) which is a binding to the C++ version of [Clipper](http://www.angusj.com/delphi/clipper.php).
 //!
@@ -8,7 +8,6 @@
 //! The [`intersection`] method (as well as [`difference`], [`union`] and [`xor`]) is provided by the [`Clipper`] trait which is implemented for some [geo-types](https://docs.rs/geo-types/0.4.3/geo_types/).
 //!
 //! ```
-//! # fn main() {
 //! use geo_types::{Coordinate, LineString, Polygon};
 //! use geo_clipper::Clipper;
 //!
@@ -37,7 +36,6 @@
 //! );
 //!
 //! let result = subject.intersection(&clip, 1.0);
-//! # }
 //! ```
 //!
 //! [`Clipper`]: trait.Clipper.html
@@ -411,11 +409,10 @@ fn execute_boolean_operation<
     result
 }
 
-/// This trait defines the boolean and offset operations between polygons
+/// This trait defines the boolean and offset operations on polygons
 ///
-/// The `factor` parameter in its methods is used to scale shapes before and after applying the boolean operation
+/// The `factor` parameter in its methods is used to scale shapes before and after applying the operation
 /// to avoid precision loss since Clipper (the underlaying library) performs integer computation.
-
 pub trait Clipper {
     fn difference<T: ToOwnedPolygon + ClosedPoly + ?Sized>(
         &self,

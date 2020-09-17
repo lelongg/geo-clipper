@@ -1,6 +1,6 @@
 # geo-clipper
 
-This crate allows to perform boolean operations on polygons.
+This crate allows to perform boolean and offset operations on polygons.
 
 [![crate.io](https://img.shields.io/crates/v/geo-clipper.svg)](https://crates.io/crates/geo-clipper)
 [![docs.rs](https://docs.rs/geo-clipper/badge.svg)](https://docs.rs/geo-clipper)
