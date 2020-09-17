@@ -168,7 +168,9 @@ impl From<ClipperPath> for LineString<f64> {
     }
 }
 
+/// Marker trait to signify a type as an open path type
 pub trait OpenPath {}
+/// Marker trait to signify a type as an closed polygon type
 pub trait ClosedPoly {}
 
 impl OpenPath for MultiLineString<f64> {}
