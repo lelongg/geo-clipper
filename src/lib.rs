@@ -708,6 +708,9 @@ pub trait Clipper {
     ) -> MultiPolygon<f64>;
 }
 
+/// This trait defines the boolean and offset operations on polygons, for integer coordinate types
+///
+/// There is no `factor`, since polygons are already in integer form
 pub trait ClipperInt {
     fn difference<T: ToOwnedPolygonInt + ClosedPoly + ?Sized>(
         &self,
@@ -747,6 +750,10 @@ pub trait ClipperOpen {
     ) -> MultiPolygon<f64>;
 }
 
+/// This trait defines the boolean and offset operations between open paths and polygons, for integer coordinate types
+/// It is a subset of the operations for polygons
+///
+/// There is no `factor`, since polygons are already in integer form
 pub trait ClipperOpenInt {
     fn difference<T: ToOwnedPolygonInt + ClosedPoly + ?Sized>(
         &self,
