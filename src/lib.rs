@@ -52,7 +52,7 @@ use clipper_sys::{
     PolyFillType_pftNonZero, PolyType, PolyType_ptClip, PolyType_ptSubject,
     Polygon as ClipperPolygon, Polygons, Vertice,
 };
-use geo_types::{Coordinate, CoordinateType, LineString, MultiLineString, MultiPolygon, Polygon};
+use geo_types::{CoordNum, Coordinate, LineString, MultiLineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
 
 #[derive(Clone, Copy)]
@@ -238,10 +238,10 @@ pub trait OpenPath {}
 /// Marker trait to signify a type as an closed polygon type
 pub trait ClosedPoly {}
 
-impl<T: CoordinateType> OpenPath for MultiLineString<T> {}
-impl<T: CoordinateType> OpenPath for LineString<T> {}
-impl<T: CoordinateType> ClosedPoly for MultiPolygon<T> {}
-impl<T: CoordinateType> ClosedPoly for Polygon<T> {}
+impl<T: CoordNum> OpenPath for MultiLineString<T> {}
+impl<T: CoordNum> OpenPath for LineString<T> {}
+impl<T: CoordNum> ClosedPoly for MultiPolygon<T> {}
+impl<T: CoordNum> ClosedPoly for Polygon<T> {}
 
 #[doc(hidden)]
 pub struct OwnedPolygon {
