@@ -694,6 +694,54 @@ fn execute_boolean_operation_int<
     result
 }
 
+fn execute_simplify_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    pft: PolyFillType,
+    factor: f64,
+) -> MultiLineString<f64> {
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe { simplify(clipper_polygons, pft.into()) };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
+fn execute_clean_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    distance: f64,
+    factor: f64,
+) -> MultiLineString<f64> {
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe { clean(clipper_polygons, distance) };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
 /// This trait defines the boolean and offset operations on polygons
 ///
 /// The `factor` parameter in its methods is used to scale shapes before and after applying the operation
@@ -726,6 +774,8 @@ pub trait Clipper {
         end_type: EndType,
         factor: f64,
     ) -> MultiPolygon<f64>;
+    fn simplify(&self, fill_type: PolyFillType, factor: f64) -> MultiLineString<f64>;
+    fn clean(&self, distance: f64, factor: f64) -> MultiLineString<f64>;
 }
 
 /// This trait defines the boolean and offset operations on polygons, for integer coordinate types
@@ -827,6 +877,14 @@ impl<U: ToOwnedPolygon + ClosedPoly + ?Sized> Clipper for U {
         factor: f64,
     ) -> MultiPolygon<f64> {
         execute_offset_operation(self, delta * factor, join_type, end_type, factor)
+    }
+
+    fn simplify(&self, fill_type: PolyFillType, factor: f64) -> MultiLineString<f64> {
+        execute_simplify_operation(self, fill_type, factor)
+    }
+
+    fn clean(&self, distance: f64, factor: f64) -> MultiLineString<f64> {
+        execute_clean_operation(self, distance * factor, factor)
     }
 }
 
