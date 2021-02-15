@@ -45,12 +45,13 @@
 //! [`xor`]: trait.Clipper.html#method.xor
 
 use clipper_sys::{
-    execute, free_polygons, offset, ClipType, ClipType_ctDifference, ClipType_ctIntersection,
-    ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType, EndType_etClosedLine,
-    EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound, EndType_etOpenSquare,
-    JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound, JoinType_jtSquare, Path,
-    PolyFillType_pftNonZero, PolyType, PolyType_ptClip, PolyType_ptSubject,
-    Polygon as ClipperPolygon, Polygons, Vertice,
+    clean, execute, free_polygons, offset, simplify, ClipType, ClipType_ctDifference,
+    ClipType_ctIntersection, ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType,
+    EndType_etClosedLine, EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound,
+    EndType_etOpenSquare, JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound,
+    JoinType_jtSquare, Path, PolyFillType as ClipperPolyFillType, PolyFillType_pftEvenOdd,
+    PolyFillType_pftNegative, PolyFillType_pftNonZero, PolyFillType_pftPositive, PolyType,
+    PolyType_ptClip, PolyType_ptSubject, Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{CoordNum, Coordinate, LineString, MultiLineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
@@ -71,6 +72,14 @@ pub enum EndType {
     OpenRound(f64),
 }
 
+#[derive(Clone, Copy)]
+pub enum PolyFillType {
+    EvenOdd,
+    NonZero,
+    Positive,
+    Negative,
+}
+
 impl From<JoinType> for ClipperJoinType {
     fn from(jt: JoinType) -> Self {
         match jt {
@@ -89,6 +98,17 @@ impl From<EndType> for ClipperEndType {
             EndType::OpenButt => EndType_etOpenButt,
             EndType::OpenSquare => EndType_etOpenSquare,
             EndType::OpenRound(_) => EndType_etOpenRound,
+        }
+    }
+}
+
+impl From<PolyFillType> for ClipperPolyFillType {
+    fn from(pft: PolyFillType) -> Self {
+        match pft {
+            PolyFillType::EvenOdd => PolyFillType_pftEvenOdd,
+            PolyFillType::NonZero => PolyFillType_pftNonZero,
+            PolyFillType::Positive => PolyFillType_pftPositive,
+            PolyFillType::Negative => PolyFillType_pftNegative,
         }
     }
 }
