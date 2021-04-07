@@ -12,5 +12,5 @@ keywords = ["geo", "polygon", "boolean", "offset"]
 categories = ["algorithms"]
 
 [dependencies]
-clipper-sys = "0.3.2"
 geo-types = "0.7.1"
+clipper-sys = { git = "https://github.com/Nevsden/clipper-sys.git", branch = "wrapper_path_conversion_optimization" }
