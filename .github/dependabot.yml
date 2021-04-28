@@ -1,0 +1,12 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: geo-types
+    versions:
+    - 0.7.0
+    - 0.7.1
