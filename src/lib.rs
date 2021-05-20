@@ -45,13 +45,14 @@
 //! [`xor`]: trait.Clipper.html#method.xor
 
 use clipper_sys::{
-    clean, execute, free_polygons, offset, simplify, ClipType, ClipType_ctDifference,
-    ClipType_ctIntersection, ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType,
-    EndType_etClosedLine, EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound,
-    EndType_etOpenSquare, JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound,
-    JoinType_jtSquare, Path, PolyFillType as ClipperPolyFillType, PolyFillType_pftEvenOdd,
-    PolyFillType_pftNegative, PolyFillType_pftNonZero, PolyFillType_pftPositive, PolyType,
-    PolyType_ptClip, PolyType_ptSubject, Polygon as ClipperPolygon, Polygons, Vertice,
+    clean, execute, free_polygons, offset, offset_simplify_clean, simplify, ClipType,
+    ClipType_ctDifference, ClipType_ctIntersection, ClipType_ctUnion, ClipType_ctXor,
+    EndType as ClipperEndType, EndType_etClosedLine, EndType_etClosedPolygon, EndType_etOpenButt,
+    EndType_etOpenRound, EndType_etOpenSquare, JoinType as ClipperJoinType, JoinType_jtMiter,
+    JoinType_jtRound, JoinType_jtSquare, Path, PolyFillType as ClipperPolyFillType,
+    PolyFillType_pftEvenOdd, PolyFillType_pftNegative, PolyFillType_pftNonZero,
+    PolyFillType_pftPositive, PolyType, PolyType_ptClip, PolyType_ptSubject,
+    Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{CoordNum, Coordinate, LineString, MultiLineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
@@ -562,6 +563,58 @@ fn execute_offset_operation<T: ToOwnedPolygon + ?Sized>(
     result
 }
 
+fn execute_offset_simplify_clean_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    delta: f64,
+    jt: JoinType,
+    et: EndType,
+    pft: PolyFillType,
+    distance: f64,
+    factor: f64,
+) -> MultiLineString<f64> {
+    let miter_limit = match jt {
+        JoinType::Miter(limit) => limit,
+        _ => 0.0,
+    };
+
+    let round_precision = match jt {
+        JoinType::Round(precision) => precision,
+        _ => match et {
+            EndType::OpenRound(precision) => precision,
+            _ => 0.0,
+        },
+    };
+
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe {
+        offset_simplify_clean(
+            clipper_polygons,
+            miter_limit,
+            round_precision,
+            jt.into(),
+            et.into(),
+            delta,
+            pft.into(),
+            distance,
+        )
+    };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
 fn execute_offset_operation_int<T: ToOwnedPolygonInt + ?Sized>(
     polygons: &T,
     delta: f64,
@@ -774,6 +827,15 @@ pub trait Clipper {
         end_type: EndType,
         factor: f64,
     ) -> MultiPolygon<f64>;
+    fn offset_simplify_clean(
+        &self,
+        delta: f64,
+        jt: JoinType,
+        et: EndType,
+        pft: PolyFillType,
+        distance: f64,
+        factor: f64,
+    ) -> MultiLineString<f64>;
     fn simplify(&self, fill_type: PolyFillType, factor: f64) -> MultiLineString<f64>;
     fn clean(&self, distance: f64, factor: f64) -> MultiLineString<f64>;
 }
@@ -877,6 +939,18 @@ impl<U: ToOwnedPolygon + ClosedPoly + ?Sized> Clipper for U {
         factor: f64,
     ) -> MultiPolygon<f64> {
         execute_offset_operation(self, delta * factor, join_type, end_type, factor)
+    }
+
+    fn offset_simplify_clean(
+        &self,
+        delta: f64,
+        jt: JoinType,
+        et: EndType,
+        pft: PolyFillType,
+        distance: f64,
+        factor: f64,
+    ) -> MultiLineString<f64> {
+        execute_offset_simplify_clean_operation(self, delta * factor, jt, et, pft, distance, factor)
     }
 
     fn simplify(&self, fill_type: PolyFillType, factor: f64) -> MultiLineString<f64> {
