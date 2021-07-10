@@ -14,6 +14,6 @@ let
     cargo = rustStable;
   };
 in mkShell {
-  buildInputs = [ clang rustStable openssl pkgconfig ];
+  buildInputs = [ rustStable openssl pkgconfig ];
   LIBCLANG_PATH = "${llvmPackages.libclang}/lib";
 }
