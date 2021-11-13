@@ -12,5 +12,5 @@ keywords = ["geo", "polygon", "boolean", "offset"]
 categories = ["algorithms"]
 
 [dependencies]
-clipper-sys = { git = "https://github.com/lelongg/clipper-sys", branch = "size_t" }
+clipper-sys = "0.6.0"
 geo-types = "0.7.1"
