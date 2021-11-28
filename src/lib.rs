@@ -45,11 +45,13 @@
 //! [`xor`]: trait.Clipper.html#method.xor
 
 use clipper_sys::{
-    execute, free_polygons, offset, ClipType, ClipType_ctDifference, ClipType_ctIntersection,
-    ClipType_ctUnion, ClipType_ctXor, EndType as ClipperEndType, EndType_etClosedLine,
-    EndType_etClosedPolygon, EndType_etOpenButt, EndType_etOpenRound, EndType_etOpenSquare,
-    JoinType as ClipperJoinType, JoinType_jtMiter, JoinType_jtRound, JoinType_jtSquare, Path,
-    PolyFillType_pftNonZero, PolyType, PolyType_ptClip, PolyType_ptSubject,
+    clean, execute, free_polygons, offset, offset_simplify_clean, simplify, ClipType,
+    ClipType_ctDifference, ClipType_ctIntersection, ClipType_ctUnion, ClipType_ctXor,
+    EndType as ClipperEndType, EndType_etClosedLine, EndType_etClosedPolygon, EndType_etOpenButt,
+    EndType_etOpenRound, EndType_etOpenSquare, JoinType as ClipperJoinType, JoinType_jtMiter,
+    JoinType_jtRound, JoinType_jtSquare, Path, PolyFillType as ClipperPolyFillType,
+    PolyFillType_pftEvenOdd, PolyFillType_pftNegative, PolyFillType_pftNonZero,
+    PolyFillType_pftPositive, PolyType, PolyType_ptClip, PolyType_ptSubject,
     Polygon as ClipperPolygon, Polygons, Vertice,
 };
 use geo_types::{CoordNum, Coordinate, LineString, MultiLineString, MultiPolygon, Polygon};
@@ -71,6 +73,14 @@ pub enum EndType {
     OpenRound(f64),
 }
 
+#[derive(Clone, Copy)]
+pub enum PolyFillType {
+    EvenOdd,
+    NonZero,
+    Positive,
+    Negative,
+}
+
 impl From<JoinType> for ClipperJoinType {
     fn from(jt: JoinType) -> Self {
         match jt {
@@ -89,6 +99,17 @@ impl From<EndType> for ClipperEndType {
             EndType::OpenButt => EndType_etOpenButt,
             EndType::OpenSquare => EndType_etOpenSquare,
             EndType::OpenRound(_) => EndType_etOpenRound,
+        }
+    }
+}
+
+impl From<PolyFillType> for ClipperPolyFillType {
+    fn from(pft: PolyFillType) -> Self {
+        match pft {
+            PolyFillType::EvenOdd => PolyFillType_pftEvenOdd,
+            PolyFillType::NonZero => PolyFillType_pftNonZero,
+            PolyFillType::Positive => PolyFillType_pftPositive,
+            PolyFillType::Negative => PolyFillType_pftNegative,
         }
     }
 }
@@ -542,6 +563,58 @@ fn execute_offset_operation<T: ToOwnedPolygon + ?Sized>(
     result
 }
 
+fn execute_offset_simplify_clean_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    delta: f64,
+    jt: JoinType,
+    et: EndType,
+    pft: PolyFillType,
+    distance: f64,
+    factor: f64,
+) -> MultiLineString<f64> {
+    let miter_limit = match jt {
+        JoinType::Miter(limit) => limit,
+        _ => 0.0,
+    };
+
+    let round_precision = match jt {
+        JoinType::Round(precision) => precision,
+        _ => match et {
+            EndType::OpenRound(precision) => precision,
+            _ => 0.0,
+        },
+    };
+
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe {
+        offset_simplify_clean(
+            clipper_polygons,
+            miter_limit,
+            round_precision,
+            jt.into(),
+            et.into(),
+            delta,
+            pft.into(),
+            distance,
+        )
+    };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
 fn execute_offset_operation_int<T: ToOwnedPolygonInt + ?Sized>(
     polygons: &T,
     delta: f64,
@@ -674,6 +747,54 @@ fn execute_boolean_operation_int<
     result
 }
 
+fn execute_simplify_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    pft: PolyFillType,
+    factor: f64,
+) -> MultiLineString<f64> {
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe { simplify(clipper_polygons, pft.into()) };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
+fn execute_clean_operation<T: ToOwnedPolygon + ?Sized>(
+    polygons: &T,
+    distance: f64,
+    factor: f64,
+) -> MultiLineString<f64> {
+    let mut owned = polygons.to_polygon_owned(PolyType_ptSubject, factor);
+    let mut get_clipper = owned.get_clipper_polygons().clone();
+    let clipper_polygons = Polygons {
+        polygons: get_clipper.as_mut_ptr(),
+        polygons_count: get_clipper.len().try_into().unwrap(),
+    };
+    let solution = unsafe { clean(clipper_polygons, distance) };
+
+    let result = ClipperPolygons {
+        polygons: solution,
+        factor,
+    }
+    .into();
+    unsafe {
+        free_polygons(solution);
+    }
+    result
+}
+
 /// This trait defines the boolean and offset operations on polygons
 ///
 /// The `factor` parameter in its methods is used to scale shapes before and after applying the operation
@@ -706,6 +827,17 @@ pub trait Clipper {
         end_type: EndType,
         factor: f64,
     ) -> MultiPolygon<f64>;
+    fn offset_simplify_clean(
+        &self,
+        delta: f64,
+        jt: JoinType,
+        et: EndType,
+        pft: PolyFillType,
+        distance: f64,
+        factor: f64,
+    ) -> MultiLineString<f64>;
+    fn simplify(&self, fill_type: PolyFillType, factor: f64) -> MultiLineString<f64>;
+    fn clean(&self, distance: f64, factor: f64) -> MultiLineString<f64>;
 }
 
 /// This trait defines the boolean and offset operations on polygons, for integer coordinate types
@@ -807,6 +939,26 @@ impl<U: ToOwnedPolygon + ClosedPoly + ?Sized> Clipper for U {
         factor: f64,
     ) -> MultiPolygon<f64> {
         execute_offset_operation(self, delta * factor, join_type, end_type, factor)
+    }
+
+    fn offset_simplify_clean(
+        &self,
+        delta: f64,
+        jt: JoinType,
+        et: EndType,
+        pft: PolyFillType,
+        distance: f64,
+        factor: f64,
+    ) -> MultiLineString<f64> {
+        execute_offset_simplify_clean_operation(self, delta * factor, jt, et, pft, distance, factor)
+    }
+
+    fn simplify(&self, fill_type: PolyFillType, factor: f64) -> MultiLineString<f64> {
+        execute_simplify_operation(self, fill_type, factor)
+    }
+
+    fn clean(&self, distance: f64, factor: f64) -> MultiLineString<f64> {
+        execute_clean_operation(self, distance * factor, factor)
     }
 }
 
