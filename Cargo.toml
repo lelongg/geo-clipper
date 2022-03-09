@@ -13,4 +13,4 @@ categories = ["algorithms"]
 
 [dependencies]
 clipper-sys = "0.7.1"
-geo-types = "0.7.1"
+geo-types = "0.7.3"
