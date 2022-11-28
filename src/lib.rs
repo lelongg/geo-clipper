@@ -8,29 +8,29 @@
 //! The [`intersection`] method (as well as [`difference`], [`union`] and [`xor`]) is provided by the [`Clipper`] trait which is implemented for some [geo-types](https://docs.rs/geo-types/0.4.3/geo_types/).
 //!
 //! ```
-//! use geo_types::{Coordinate, LineString, Polygon};
+//! use geo_types::{Coord, LineString, Polygon};
 //! use geo_clipper::Clipper;
 //!
 //! let subject = Polygon::new(
 //!     LineString(vec![
-//!         Coordinate { x: 180.0, y: 200.0 },
-//!         Coordinate { x: 260.0, y: 200.0 },
-//!         Coordinate { x: 260.0, y: 150.0 },
-//!         Coordinate { x: 180.0, y: 150.0 },
+//!         Coord { x: 180.0, y: 200.0 },
+//!         Coord { x: 260.0, y: 200.0 },
+//!         Coord { x: 260.0, y: 150.0 },
+//!         Coord { x: 180.0, y: 150.0 },
 //!     ]),
 //!     vec![LineString(vec![
-//!         Coordinate { x: 215.0, y: 160.0 },
-//!         Coordinate { x: 230.0, y: 190.0 },
-//!         Coordinate { x: 200.0, y: 190.0 },
+//!         Coord { x: 215.0, y: 160.0 },
+//!         Coord { x: 230.0, y: 190.0 },
+//!         Coord { x: 200.0, y: 190.0 },
 //!     ])],
 //! );
 //!
 //! let clip = Polygon::new(
 //!     LineString(vec![
-//!         Coordinate { x: 190.0, y: 210.0 },
-//!         Coordinate { x: 240.0, y: 210.0 },
-//!         Coordinate { x: 240.0, y: 130.0 },
-//!         Coordinate { x: 190.0, y: 130.0 },
+//!         Coord { x: 190.0, y: 210.0 },
+//!         Coord { x: 240.0, y: 210.0 },
+//!         Coord { x: 240.0, y: 130.0 },
+//!         Coord { x: 190.0, y: 130.0 },
 //!     ]),
 //!     vec![],
 //! );
@@ -54,7 +54,7 @@ use clipper_sys::{
     PolyFillType_pftPositive, PolyType, PolyType_ptClip, PolyType_ptSubject,
     Polygon as ClipperPolygon, Polygons, Vertice,
 };
-use geo_types::{CoordNum, Coordinate, LineString, MultiLineString, MultiPolygon, Polygon};
+use geo_types::{Coord, CoordNum, LineString, MultiLineString, MultiPolygon, Polygon};
 use std::convert::TryInto;
 
 #[derive(Clone, Copy)]
@@ -233,7 +233,7 @@ impl From<ClipperPath> for LineString<f64> {
         path.path
             .vertices()
             .iter()
-            .map(|vertice| Coordinate {
+            .map(|vertice| Coord {
                 x: vertice[0] as f64 / path.factor,
                 y: vertice[1] as f64 / path.factor,
             })
@@ -246,7 +246,7 @@ impl From<ClipperPath> for LineString<i64> {
         path.path
             .vertices()
             .iter()
-            .map(|vertice| Coordinate {
+            .map(|vertice| Coord {
                 x: vertice[0],
                 y: vertice[1],
             })
@@ -1046,38 +1046,38 @@ mod tests {
     fn test_closed_clip() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
-                Coordinate { x: 240.0, y: 200.0 },
-                Coordinate { x: 190.0, y: 200.0 },
-                Coordinate { x: 190.0, y: 150.0 },
-                Coordinate { x: 240.0, y: 150.0 },
+                Coord { x: 240.0, y: 200.0 },
+                Coord { x: 190.0, y: 200.0 },
+                Coord { x: 190.0, y: 150.0 },
+                Coord { x: 240.0, y: 150.0 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 200.0, y: 190.0 },
-                Coordinate { x: 230.0, y: 190.0 },
-                Coordinate { x: 215.0, y: 160.0 },
+                Coord { x: 200.0, y: 190.0 },
+                Coord { x: 230.0, y: 190.0 },
+                Coord { x: 215.0, y: 160.0 },
             ])],
         )]);
 
         let subject = Polygon::new(
             LineString(vec![
-                Coordinate { x: 180.0, y: 200.0 },
-                Coordinate { x: 260.0, y: 200.0 },
-                Coordinate { x: 260.0, y: 150.0 },
-                Coordinate { x: 180.0, y: 150.0 },
+                Coord { x: 180.0, y: 200.0 },
+                Coord { x: 260.0, y: 200.0 },
+                Coord { x: 260.0, y: 150.0 },
+                Coord { x: 180.0, y: 150.0 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 215.0, y: 160.0 },
-                Coordinate { x: 230.0, y: 190.0 },
-                Coordinate { x: 200.0, y: 190.0 },
+                Coord { x: 215.0, y: 160.0 },
+                Coord { x: 230.0, y: 190.0 },
+                Coord { x: 200.0, y: 190.0 },
             ])],
         );
 
         let clip = Polygon::new(
             LineString(vec![
-                Coordinate { x: 190.0, y: 210.0 },
-                Coordinate { x: 240.0, y: 210.0 },
-                Coordinate { x: 240.0, y: 130.0 },
-                Coordinate { x: 190.0, y: 130.0 },
+                Coord { x: 190.0, y: 210.0 },
+                Coord { x: 240.0, y: 210.0 },
+                Coord { x: 240.0, y: 130.0 },
+                Coord { x: 190.0, y: 130.0 },
             ]),
             vec![],
         );
@@ -1090,38 +1090,38 @@ mod tests {
     fn test_closed_clip_int() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
-                Coordinate { x: 240, y: 200 },
-                Coordinate { x: 190, y: 200 },
-                Coordinate { x: 190, y: 150 },
-                Coordinate { x: 240, y: 150 },
+                Coord { x: 240, y: 200 },
+                Coord { x: 190, y: 200 },
+                Coord { x: 190, y: 150 },
+                Coord { x: 240, y: 150 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 200, y: 190 },
-                Coordinate { x: 230, y: 190 },
-                Coordinate { x: 215, y: 160 },
+                Coord { x: 200, y: 190 },
+                Coord { x: 230, y: 190 },
+                Coord { x: 215, y: 160 },
             ])],
         )]);
 
         let subject = Polygon::new(
             LineString(vec![
-                Coordinate { x: 180, y: 200 },
-                Coordinate { x: 260, y: 200 },
-                Coordinate { x: 260, y: 150 },
-                Coordinate { x: 180, y: 150 },
+                Coord { x: 180, y: 200 },
+                Coord { x: 260, y: 200 },
+                Coord { x: 260, y: 150 },
+                Coord { x: 180, y: 150 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 215, y: 160 },
-                Coordinate { x: 230, y: 190 },
-                Coordinate { x: 200, y: 190 },
+                Coord { x: 215, y: 160 },
+                Coord { x: 230, y: 190 },
+                Coord { x: 200, y: 190 },
             ])],
         );
 
         let clip = Polygon::new(
             LineString(vec![
-                Coordinate { x: 190, y: 210 },
-                Coordinate { x: 240, y: 210 },
-                Coordinate { x: 240, y: 130 },
-                Coordinate { x: 190, y: 130 },
+                Coord { x: 190, y: 210 },
+                Coord { x: 240, y: 210 },
+                Coord { x: 240, y: 130 },
+                Coord { x: 190, y: 130 },
             ]),
             vec![],
         );
@@ -1134,29 +1134,29 @@ mod tests {
     fn test_closed_offset() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
-                Coordinate { x: 265.0, y: 205.0 },
-                Coordinate { x: 175.0, y: 205.0 },
-                Coordinate { x: 175.0, y: 145.0 },
-                Coordinate { x: 265.0, y: 145.0 },
+                Coord { x: 265.0, y: 205.0 },
+                Coord { x: 175.0, y: 205.0 },
+                Coord { x: 175.0, y: 145.0 },
+                Coord { x: 265.0, y: 145.0 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 208.0, y: 185.0 },
-                Coordinate { x: 222.0, y: 185.0 },
-                Coordinate { x: 215.0, y: 170.0 },
+                Coord { x: 208.0, y: 185.0 },
+                Coord { x: 222.0, y: 185.0 },
+                Coord { x: 215.0, y: 170.0 },
             ])],
         )]);
 
         let subject = Polygon::new(
             LineString(vec![
-                Coordinate { x: 180.0, y: 200.0 },
-                Coordinate { x: 260.0, y: 200.0 },
-                Coordinate { x: 260.0, y: 150.0 },
-                Coordinate { x: 180.0, y: 150.0 },
+                Coord { x: 180.0, y: 200.0 },
+                Coord { x: 260.0, y: 200.0 },
+                Coord { x: 260.0, y: 150.0 },
+                Coord { x: 180.0, y: 150.0 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 215.0, y: 160.0 },
-                Coordinate { x: 230.0, y: 190.0 },
-                Coordinate { x: 200.0, y: 190.0 },
+                Coord { x: 215.0, y: 160.0 },
+                Coord { x: 230.0, y: 190.0 },
+                Coord { x: 200.0, y: 190.0 },
             ])],
         );
 
@@ -1168,29 +1168,29 @@ mod tests {
     fn test_closed_offset_int() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
-                Coordinate { x: 265, y: 205 },
-                Coordinate { x: 175, y: 205 },
-                Coordinate { x: 175, y: 145 },
-                Coordinate { x: 265, y: 145 },
+                Coord { x: 265, y: 205 },
+                Coord { x: 175, y: 205 },
+                Coord { x: 175, y: 145 },
+                Coord { x: 265, y: 145 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 208, y: 185 },
-                Coordinate { x: 222, y: 185 },
-                Coordinate { x: 215, y: 170 },
+                Coord { x: 208, y: 185 },
+                Coord { x: 222, y: 185 },
+                Coord { x: 215, y: 170 },
             ])],
         )]);
 
         let subject = Polygon::new(
             LineString(vec![
-                Coordinate { x: 180, y: 200 },
-                Coordinate { x: 260, y: 200 },
-                Coordinate { x: 260, y: 150 },
-                Coordinate { x: 180, y: 150 },
+                Coord { x: 180, y: 200 },
+                Coord { x: 260, y: 200 },
+                Coord { x: 260, y: 150 },
+                Coord { x: 180, y: 150 },
             ]),
             vec![LineString(vec![
-                Coordinate { x: 215, y: 160 },
-                Coordinate { x: 230, y: 190 },
-                Coordinate { x: 200, y: 190 },
+                Coord { x: 215, y: 160 },
+                Coord { x: 230, y: 190 },
+                Coord { x: 200, y: 190 },
             ])],
         );
 
@@ -1202,26 +1202,26 @@ mod tests {
     fn test_open_clip() {
         let expected = MultiLineString(vec![
             LineString(vec![
-                Coordinate { x: 200.0, y: 100.0 },
-                Coordinate { x: 100.0, y: 100.0 },
+                Coord { x: 200.0, y: 100.0 },
+                Coord { x: 100.0, y: 100.0 },
             ]),
             LineString(vec![
-                Coordinate { x: 400.0, y: 100.0 },
-                Coordinate { x: 300.0, y: 100.0 },
+                Coord { x: 400.0, y: 100.0 },
+                Coord { x: 300.0, y: 100.0 },
             ]),
         ]);
 
         let subject = MultiLineString(vec![LineString(vec![
-            Coordinate { x: 100.0, y: 100.0 },
-            Coordinate { x: 400.0, y: 100.0 },
+            Coord { x: 100.0, y: 100.0 },
+            Coord { x: 400.0, y: 100.0 },
         ])]);
         let clip = Polygon::new(
             LineString(vec![
-                Coordinate { x: 200.0, y: 50.0 },
-                Coordinate { x: 200.0, y: 150.0 },
-                Coordinate { x: 300.0, y: 150.0 },
-                Coordinate { x: 300.0, y: 50.0 },
-                Coordinate { x: 200.0, y: 50.0 },
+                Coord { x: 200.0, y: 50.0 },
+                Coord { x: 200.0, y: 150.0 },
+                Coord { x: 300.0, y: 150.0 },
+                Coord { x: 300.0, y: 50.0 },
+                Coord { x: 200.0, y: 50.0 },
             ]),
             vec![],
         );
@@ -1233,27 +1233,21 @@ mod tests {
     #[test]
     fn test_open_clip_int() {
         let expected = MultiLineString(vec![
-            LineString(vec![
-                Coordinate { x: 200, y: 100 },
-                Coordinate { x: 100, y: 100 },
-            ]),
-            LineString(vec![
-                Coordinate { x: 400, y: 100 },
-                Coordinate { x: 300, y: 100 },
-            ]),
+            LineString(vec![Coord { x: 200, y: 100 }, Coord { x: 100, y: 100 }]),
+            LineString(vec![Coord { x: 400, y: 100 }, Coord { x: 300, y: 100 }]),
         ]);
 
         let subject = MultiLineString(vec![LineString(vec![
-            Coordinate { x: 100, y: 100 },
-            Coordinate { x: 400, y: 100 },
+            Coord { x: 100, y: 100 },
+            Coord { x: 400, y: 100 },
         ])]);
         let clip = Polygon::new(
             LineString(vec![
-                Coordinate { x: 200, y: 50 },
-                Coordinate { x: 200, y: 150 },
-                Coordinate { x: 300, y: 150 },
-                Coordinate { x: 300, y: 50 },
-                Coordinate { x: 200, y: 50 },
+                Coord { x: 200, y: 50 },
+                Coord { x: 200, y: 150 },
+                Coord { x: 300, y: 150 },
+                Coord { x: 300, y: 50 },
+                Coord { x: 200, y: 50 },
             ]),
             vec![],
         );
@@ -1266,21 +1260,21 @@ mod tests {
     fn test_open_offset() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
-                Coordinate { x: 405.0, y: 405.0 },
-                Coordinate { x: 395.0, y: 405.0 },
-                Coordinate { x: 395.0, y: 105.0 },
-                Coordinate { x: 95.0, y: 105.0 },
-                Coordinate { x: 95.0, y: 95.0 },
-                Coordinate { x: 405.0, y: 95.0 },
-                Coordinate { x: 405.0, y: 405.0 },
+                Coord { x: 405.0, y: 405.0 },
+                Coord { x: 395.0, y: 405.0 },
+                Coord { x: 395.0, y: 105.0 },
+                Coord { x: 95.0, y: 105.0 },
+                Coord { x: 95.0, y: 95.0 },
+                Coord { x: 405.0, y: 95.0 },
+                Coord { x: 405.0, y: 405.0 },
             ]),
             vec![],
         )]);
 
         let subject = MultiLineString(vec![LineString(vec![
-            Coordinate { x: 100.0, y: 100.0 },
-            Coordinate { x: 400.0, y: 100.0 },
-            Coordinate { x: 400.0, y: 400.0 },
+            Coord { x: 100.0, y: 100.0 },
+            Coord { x: 400.0, y: 100.0 },
+            Coord { x: 400.0, y: 400.0 },
         ])]);
         let result = subject.offset(5.0, JoinType::Miter(5.0), EndType::OpenSquare, 1.0);
         assert_eq!(expected, result);
@@ -1290,21 +1284,21 @@ mod tests {
     fn test_open_offset_int() {
         let expected = MultiPolygon(vec![Polygon::new(
             LineString(vec![
-                Coordinate { x: 405, y: 405 },
-                Coordinate { x: 395, y: 405 },
-                Coordinate { x: 395, y: 105 },
-                Coordinate { x: 95, y: 105 },
-                Coordinate { x: 95, y: 95 },
-                Coordinate { x: 405, y: 95 },
-                Coordinate { x: 405, y: 405 },
+                Coord { x: 405, y: 405 },
+                Coord { x: 395, y: 405 },
+                Coord { x: 395, y: 105 },
+                Coord { x: 95, y: 105 },
+                Coord { x: 95, y: 95 },
+                Coord { x: 405, y: 95 },
+                Coord { x: 405, y: 405 },
             ]),
             vec![],
         )]);
 
         let subject = MultiLineString(vec![LineString(vec![
-            Coordinate { x: 100, y: 100 },
-            Coordinate { x: 400, y: 100 },
-            Coordinate { x: 400, y: 400 },
+            Coord { x: 100, y: 100 },
+            Coord { x: 400, y: 100 },
+            Coord { x: 400, y: 400 },
         ])]);
         let result = subject.offset(5.0, JoinType::Miter(5.0), EndType::OpenSquare);
         assert_eq!(expected, result);
