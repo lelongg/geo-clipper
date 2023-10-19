@@ -14,7 +14,7 @@
         };
       in with pkgs; {
         devShell = mkShell {
-          buildInputs = [ openssl pkgconfig rustStable cargo-release ];
+          buildInputs = [ openssl pkg-config rustStable cargo-release ];
         };
       });
 }
