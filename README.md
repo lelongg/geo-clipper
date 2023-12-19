@@ -43,8 +43,8 @@ let clip = Polygon::new(
 let result = subject.intersection(&clip, 1.0);
 ```
 
-[`Clipper`]: trait.Clipper.html
-[`intersection`]: trait.Clipper.html#method.intersection
-[`difference`]: trait.Clipper.html#method.difference
-[`union`]: trait.Clipper.html#method.union
-[`xor`]: trait.Clipper.html#method.xor
+[`Clipper`]: https://docs.rs/geo-clipper/latest/geo_clipper/trait.Clipper.html
+[`intersection`]: https://docs.rs/geo-clipper/latest/geo_clipper/trait.Clipper.html#method.intersection
+[`difference`]: https://docs.rs/geo-clipper/latest/geo_clipper/trait.Clipper.html#method.difference
+[`union`]: https://docs.rs/geo-clipper/latest/geo_clipper/trait.Clipper.html#method.union
+[`xor`]: https://docs.rs/geo-clipper/latest/geo_clipper/trait.Clipper.html#method.xor
