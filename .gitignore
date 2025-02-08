@@ -2,4 +2,12 @@ Cargo.lock
 target/
 .envrc
 .direnv/
-firedbg
+firedbg# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml
